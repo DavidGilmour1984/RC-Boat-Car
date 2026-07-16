@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rover Control</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #f0f2f5;
+  --panel:   #ffffff;
+  --card:    #e8ecf2;
+  --border:  #b0bcd0;
+  --accent:  #0057cc;
+  --green:   #008a3c;
+  --warn:    #b85c00;
+  --danger:  #cc0000;
+  --text:    #0a0f1e;
+  --sub:     #2a3550;
+  --dim:     #4a5878;
+  --font:    'Inter', sans-serif;
+  --mono:    'JetBrains Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  height: 100vh;
+  display: grid;
+  grid-template-rows: 52px 1fr;
+  grid-template-columns: 310px 1fr 270px;
+  overflow: hidden;
+}
+
+/* ── HEADER ── */
+header {
+  grid-column: 1/-1;
+  background: var(--panel);
+  border-bottom: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  gap: 24px;
+}
+header h1 { font-size: 17px; font-weight: 700; letter-spacing: 3px; color: var(--accent); }
+.hdr-pill {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sub);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.hdr-pill span { color: var(--text); }
+.hdr-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+#connectBtn {
+  background: var(--accent); color: #0a0f1e;
+  border: none; padding: 7px 18px;
+  font-family: var(--font); font-size: 13px; font-weight: 700;
+  cursor: pointer; border-radius: 6px; letter-spacing: 1px;
+  transition: background 0.2s;
+}
+#connectBtn:hover { background: #0044aa; color: #fff; }
+#connectBtn.connected { background: var(--green); color: #fff; }
+
+/* ── LEFT PANEL ── */
+.left-panel {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+.card-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--sub);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-title .expander {
+  cursor: pointer;
+  color: var(--dim);
+  font-size: 14px;
+  transition: transform 0.2s;
+  user-select: none;
+}
+.card-title .expander.open { transform: rotate(180deg); }
+
+/* Mission */
+.mission-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 10px;
+  border-radius: 6px;
+  outline: none;
+  margin-bottom: 8px;
+}
+.mission-input:focus { border-color: var(--accent); }
+.mission-input::placeholder { color: var(--dim); }
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+/* Mode toggle */
+.mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 2px; }
+.mode-btn {
+  background: var(--bg); color: var(--sub);
+  border: 1.5px solid var(--border);
+  padding: 12px 8px; font-family: var(--font);
+  font-size: 16px; font-weight: 600;
+  cursor: pointer; text-align: center;
+  border-radius: 6px; transition: all 0.15s;
+}
+.mode-btn.active { background: var(--accent); color: #0a0f1e; border-color: var(--accent); }
+
+/* Start mission button */
+#startBtn {
+  width: 100%; padding: 14px;
+  background: var(--green); color: #0a1a12;
+  border: none; border-radius: 8px;
+  font-family: var(--font); font-size: 17px; font-weight: 700;
+  cursor: pointer; letter-spacing: 1px;
+  transition: all 0.2s;
+}
+#startBtn.confirm { background: var(--warn); color: #1a1000; }
+#startBtn.running { background: var(--danger); color: #fff; }
+#startBtn:disabled { background: var(--dim); color: var(--bg); cursor: not-allowed; }
+
+/* Slider */
+.slider-row { margin: 8px 0; }
+.slider-label {
+  display: flex; justify-content: space-between;
+  font-size: 15px; font-weight: 500; color: var(--text);
+  margin-bottom: 5px;
+}
+.slider-label em { color: var(--accent); font-style: normal; font-weight: 700; font-family: var(--mono); }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+
+/* Toggle */
+.toggle-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 15px; font-weight: 500; color: var(--text);
+  margin: 8px 0;
+}
+.toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.tslider {
+  position: absolute; cursor: pointer; inset: 0;
+  background: var(--border); border-radius: 22px; transition: 0.2s;
+}
+.tslider:before {
+  content: ''; position: absolute;
+  width: 14px; height: 14px; left: 4px; bottom: 4px;
+  background: var(--sub); border-radius: 50%; transition: 0.2s;
+}
+.toggle input:checked + .tslider { background: var(--accent); }
+.toggle input:checked + .tslider:before { transform: translateX(18px); background: #0a0f1e; }
+
+/* Manual advance controls */
+#manualAdvControls {
+  display: none;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+#manualAdvControls .adv-label {
+  font-size: 11px; font-weight: 600; color: var(--sub);
+  letter-spacing: 1px; margin-bottom: 8px;
+}
+
+/* Settings expander content */
+.settings-body { display: none; }
+.settings-body.open { display: block; }
+
+/* Buttons */
+.btn {
+  background: var(--bg); color: var(--text);
+  border: 1.5px solid var(--border);
+  padding: 10px 12px; font-family: var(--font);
+  font-size: 15px; font-weight: 500;
+  cursor: pointer; width: 100%;
+  margin-top: 6px; min-height: 42px;
+  border-radius: 6px; transition: all 0.15s;
+  letter-spacing: 0.3px;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(77,184,255,0.07); }
+.btn.green  { border-color: var(--green);  color: var(--green); }
+.btn.green:hover  { background: rgba(61,220,132,0.08); }
+.btn.warn   { border-color: var(--warn);   color: var(--warn); }
+.btn.warn:hover   { background: rgba(255,204,68,0.08); }
+.btn.danger { border-color: var(--danger); color: var(--danger); }
+.btn.danger:hover { background: rgba(255,92,92,0.1); }
+.btn.active-place { border-color: var(--warn); color: var(--warn); background: rgba(255,204,68,0.08); }
+.btn.active-move  { border-color: var(--warn); color: var(--warn); background: rgba(255,204,68,0.08); }
+
+/* ── MAP ── */
+#mapWrap {
+  position: relative;
+  overflow: hidden;
+}
+#map { width: 100%; height: 100%; }
+#manualHintBar {
+  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+  z-index: 1000; background: rgba(26,31,46,0.92);
+  border: 1.5px solid var(--accent); border-radius: 20px;
+  padding: 7px 20px; font-size: 15px; font-weight: 600;
+  color: var(--accent); letter-spacing: 1px;
+  pointer-events: none; display: none;
+}
+#manualHintBar.visible { display: block; }
+
+/* Waypoint drawer */
+#wpDrawer {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: var(--panel); border-top: 2px solid var(--border);
+  z-index: 900; transform: translateY(100%);
+  transition: transform 0.25s ease;
+  
+  display: flex; flex-direction: column;
+}
+#wpDrawer.open { transform: translateY(0); }
+#wpDrawerHandle {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#wpDrawerHandle h3 { font-size: 15px; font-weight: 600; color: var(--text); }
+#wpDrawerHandle .wp-count {
+  background: var(--accent); color: #0a0f1e;
+  border-radius: 12px; padding: 2px 10px;
+  font-size: 12px; font-weight: 700; font-family: var(--mono);
+}
+#wpDrawerHandle .chevron { color: var(--sub); font-size: 18px; transition: transform 0.25s; }
+#wpDrawer.open #wpDrawerHandle .chevron { transform: rotate(180deg); }
+#wpDrawerToolbar {
+  display: flex; gap: 8px; padding: 10px 14px;
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+#wpDrawerToolbar .tbtn {
+  background: var(--card); color: var(--text);
+  border: 1.5px solid var(--border);
+  padding: 7px 14px; font-family: var(--font);
+  font-size: 14px; font-weight: 600;
+  cursor: pointer; border-radius: 6px; transition: all 0.15s;
+}
+#wpDrawerToolbar .tbtn:hover { border-color: var(--accent); color: var(--accent); }
+#wpDrawerToolbar .tbtn.active { border-color: var(--warn); color: var(--warn); background: rgba(255,204,68,0.08); }
+#wpDrawerToolbar .tbtn.danger { border-color: var(--danger); color: var(--danger); }
+#wpList {
+  max-height: 168px;
+  list-style: none; overflow-y: auto; padding: 8px 14px; flex: 1;
+}
+#wpList li {
+  display: grid;
+  grid-template-columns: 28px 1fr auto auto auto auto;
+  align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 500; color: var(--text);
+  padding: 8px 10px; border-radius: 6px;
+  margin: 3px 0; border: 1.5px solid var(--border);
+  cursor: pointer; transition: border-color 0.15s;
+}
+#wpList li:hover { border-color: var(--accent); }
+#wpList li.active-wp { border-color: var(--green); background: rgba(61,220,132,0.06); }
+#wpList li.done-wp   { opacity: 0.4; }
+.wp-num { color: var(--accent); font-weight: 700; font-family: var(--mono); font-size: 13px; }
+.wp-coords { color: var(--sub); font-family: var(--mono); font-size: 11px; }
+.wp-spd, .wp-rad { font-size: 11px; color: var(--dim); white-space: nowrap; }
+.wp-edit-btn { color: var(--accent); cursor: pointer; font-size: 15px; padding: 2px 4px; }
+.wp-del-btn  { color: var(--danger); cursor: pointer; font-size: 16px; padding: 2px 4px; }
+
+/* ── RIGHT PANEL ── */
+.right-panel {
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  overflow-y: auto; padding: 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.tele-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tele-cell {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 7px; padding: 10px 8px; text-align: center;
+}
+.tele-lbl { font-size: 11px; font-weight: 700; color: var(--sub); letter-spacing: 1.5px; display: block; margin-bottom: 3px; }
+.tele-val { font-size: 20px; color: var(--accent); font-weight: 700; font-family: var(--mono); line-height: 1; }
+.tele-unit { font-size: 10px; color: var(--dim); }
+
+.bat-bar-outer { width: 100%; height: 8px; background: var(--border); border-radius: 4px; margin-top: 6px; overflow: hidden; }
+.bat-bar-inner { height: 100%; border-radius: 4px; transition: width 0.5s, background 0.5s; }
+
+.rssi-bars { display: flex; gap: 3px; align-items: flex-end; height: 22px; }
+.rssi-bar  { width: 7px; background: var(--border); border-radius: 2px; }
+
+.alert {
+  padding: 10px 12px; border-radius: 7px;
+  font-size: 13px; font-weight: 600;
+  text-align: center; display: none;
+}
+.alert.visible { display: block; }
+.alert.warn   { background: #fff3e0; border: 2px solid var(--warn);   color: var(--warn); }
+.alert.danger { background: #ffe8e8; border: 2px solid var(--danger); color: var(--danger); }
+
+#logBox {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 7px; height: 90px; overflow-y: auto;
+  padding: 8px; font-size: 11px; font-family: var(--mono);
+  color: var(--sub); line-height: 1.6;
+}
+
+/* ── WAYPOINT EDIT POPUP ── */
+#wpEditPopup {
+  position: fixed; z-index: 9999;
+  background: var(--panel); border: 2px solid var(--accent);
+  border-radius: 10px; padding: 16px; min-width: 260px;
+  display: none; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+#wpEditPopup.visible { display: block; }
+#wpEditPopup .ep-title { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 12px; letter-spacing: 1px; }
+#wpEditPopup label { font-size: 11px; font-weight: 600; color: var(--sub); display: block; margin-bottom: 3px; margin-top: 10px; }
+#wpEditPopup input[type=number], #wpEditPopup input[type=range] {
+  width: 100%; background: var(--bg); border: 1.5px solid var(--border);
+  color: var(--text); font-family: var(--mono); font-size: 13px;
+  padding: 7px 10px; border-radius: 6px; outline: none;
+}
+#wpEditPopup input[type=number]:focus { border-color: var(--accent); }
+#wpEditPopup .ep-row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 12px; color: var(--sub); }
+#wpEditPopup .ep-row em { color: var(--accent); font-style: normal; font-family: var(--mono); font-weight: 600; }
+#wpEditPopup .ep-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+#wpEditPopup .ep-btns .btn { margin-top: 0; }
+
+/* Arrived card */
+#arrivedCard {
+  display: none; border-color: var(--green);
+  background: #e6f9ee;
+}
+#arrivedCard .arr-title { font-size: 13px; font-weight: 700; color: var(--green); margin-bottom: 8px; }
+#arrivedCard .arr-sub { font-size: 11px; color: var(--sub); margin-bottom: 10px; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Waypoint edit popup -->
+<div id="wpEditPopup">
+  <div class="ep-title">✎ EDIT WAYPOINT <span id="epNum"></span></div>
+  <label>LATITUDE</label>
+  <input type="number" id="epLat" step="0.000001">
+  <label>LONGITUDE</label>
+  <input type="number" id="epLon" step="0.000001">
+  <label>SPEED <span id="epSpdVal" style="color:var(--accent);font-family:var(--mono);"></span></label>
+  <input type="range" id="epSpd" min="0" max="255" oninput="document.getElementById('epSpdVal').textContent=this.value">
+  <label>ARRIVAL RADIUS <span id="epRadVal" style="color:var(--accent);font-family:var(--mono);"></span> m</label>
+  <input type="range" id="epRad" min="3" max="30" oninput="document.getElementById('epRadVal').textContent=this.value">
+  <label>LABEL (optional)</label>
+  <input type="number" id="epLabel" style="font-family:var(--font);" placeholder="e.g. Gate, Turn point">
+  <div class="ep-btns">
+    <button class="btn green" onclick="confirmWpEdit()" style="margin-top:0;">✔ Confirm</button>
+    <button class="btn" onclick="closeWpEdit()" style="margin-top:0;">✕ Cancel</button>
+  </div>
+</div>
+
+<!-- ── HEADER ── -->
+<header>
+  <h1>⬡ ROVER</h1>
+  <div class="hdr-pill">MODE <span id="hMode">—</span></div>
+  <div class="hdr-pill">FIX <span id="hFix">—</span></div>
+  <div class="hdr-pill">WP <span id="hWp">—</span></div>
+  <div class="hdr-pill">COMMS <span id="hComms" style="color:var(--danger);">OFFLINE</span></div>
+  <div class="hdr-pill">ROVER <span id="hRover" style="color:var(--danger);">NO SIGNAL</span></div>
+  <div class="hdr-pill" style="gap:8px;">
+    <div class="rssi-bars" id="rssiBarsMini" style="height:16px;">
+      <div class="rssi-bar" style="height:4px;"></div>
+      <div class="rssi-bar" style="height:7px;"></div>
+      <div class="rssi-bar" style="height:10px;"></div>
+      <div class="rssi-bar" style="height:13px;"></div>
+      <div class="rssi-bar" style="height:16px;"></div>
+    </div>
+    <span id="hRSSI" style="color:var(--dim);font-family:var(--mono);font-size:12px;">— dBm</span>
+  </div>
+  <div class="hdr-right">
+    <button id="connectBtn" onclick="connectSerial()">CONNECT</button>
+    <button class="btn" onclick="downloadTripCSV()" style="width:auto;padding:7px 14px;margin-top:0;min-height:0;font-size:12px;">⬇ Trip Log</button>
+  </div>
+</header>
+
+<!-- ── LEFT PANEL ── -->
+<div class="left-panel">
+
+  <!-- Mission -->
+  <div class="card">
+    <div class="card-title">Mission</div>
+    <input class="mission-input" id="missionName" type="text" placeholder="Mission name…" maxlength="40">
+    <div class="btn-row">
+      <button class="btn" onclick="saveMission()" style="margin-top:0;">💾 Save</button>
+      <button class="btn" onclick="loadMissionPick()" style="margin-top:0;">📂 Load</button>
+    </div>
+    <input type="file" id="missionFilePick" accept=".csv" style="display:none" onchange="loadMission(this)">
+  </div>
+
+  <!-- Drive mode -->
+  <div class="card">
+    <div class="card-title">Drive Mode</div>
+    <div class="mode-toggle">
+      <div class="mode-btn active" id="btnManual" onclick="setMode(0)">Manual</div>
+      <div class="mode-btn"        id="btnAuto"   onclick="setMode(1)">Auto</div>
+    </div>
+  </div>
+
+  <!-- E-Stop above mission control -->
+  <button class="btn danger" onclick="emergencyStop()" style="min-height:52px;font-size:17px;font-weight:700;">⚡ EMERGENCY STOP</button>
+
+  <!-- Mission control -->
+  <div class="card">
+    <div class="card-title">Mission Control</div>
+    <button id="startBtn" onclick="handleStart()" disabled>START MISSION</button>
+    <div id="startHint" style="font-size:11px;color:var(--dim);text-align:center;margin-top:6px;">Connect and add waypoints to begin</div>
+
+    <!-- Running controls — shown when mission is active in auto mode -->
+    <div id="runningControls" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+      <div style="font-size:11px;font-weight:600;color:var(--sub);letter-spacing:1px;margin-bottom:8px;">ROUTE CONTROL</div>
+      <div class="btn-row">
+        <button class="btn green" id="advanceBtn" onclick="manualAdvance()" style="margin-top:0;">▶ Advance</button>
+        <button class="btn warn"  id="pauseBtn"   onclick="togglePause()"   style="margin-top:0;">⏸ Pause</button>
+      </div>
+    </div>
+
+    <!-- Arrived card -->
+    <div id="arrivedCard" class="card" style="margin-top:10px;">
+      <div class="arr-title">✔ Arrived at Waypoint <span id="arrWpNum">—</span></div>
+      <div class="arr-sub" id="arrWpLabel"></div>
+      <div class="btn-row">
+        <button class="btn green" onclick="manualAdvance()" style="margin-top:0;">▶ Advance</button>
+        <button class="btn warn"  id="pauseBtn" onclick="togglePause()" style="margin-top:0;">⏸ Pause</button>
+      </div>
+    </div>
+
+    <!-- Manual advance controls when auto-advance off -->
+    <div id="manualAdvControls">
+      <div class="adv-label">MANUAL ROUTE CONTROL</div>
+      <div class="btn-row">
+        <button class="btn green" onclick="manualAdvance()" style="margin-top:0;">▶ Advance</button>
+        <button class="btn warn"  id="pauseBtn2" onclick="togglePause()" style="margin-top:0;">⏸ Pause</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Speed -->
+  <div class="card">
+    <div class="card-title">Global Speed</div>
+    <div class="slider-row">
+      <div class="slider-label">Default speed <em id="spdVal">150</em></div>
+      <input type="range" id="speedSlider" min="0" max="255" value="150"
+             oninput="document.getElementById('spdVal').textContent=this.value; sendCmd();">
+    </div>
+  </div>
+
+  <!-- Settings (collapsible) -->
+  <div class="card">
+    <div class="card-title">
+      Settings
+      <span class="expander" id="settingsExp" onclick="toggleSettings()">▼</span>
+    </div>
+    <div class="settings-body" id="settingsBody">
+      <div class="slider-row">
+        <div class="slider-label">Default arrival radius <em id="radVal">7</em> m</div>
+        <input type="range" id="radiusSlider" min="3" max="30" value="7"
+               oninput="document.getElementById('radVal').textContent=this.value; sendCmd();">
+      </div>
+      <div class="toggle-row">
+        Auto-advance waypoints
+        <label class="toggle">
+          <input type="checkbox" id="autoAdvance" onchange="onAutoAdvChange()">
+          <span class="tslider"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        Loop mode
+        <label class="toggle">
+          <input type="checkbox" id="loopMode" onchange="updateRouteLine(); sendCmd()">
+          <span class="tslider"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        Heading lock (manual)
+        <label class="toggle">
+          <input type="checkbox" id="headingLock" onchange="sendCmd()">
+          <span class="tslider"></span>
+        </label>
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">Lock bearing <em id="hlVal">0</em>°</div>
+        <input type="range" id="hlSlider" min="0" max="359" value="0"
+               oninput="document.getElementById('hlVal').textContent=this.value; sendCmd();">
+      </div>
+      <div class="toggle-row">
+        Stuck detection
+        <label class="toggle">
+          <input type="checkbox" id="stuckDetect" onchange="sendCmd()">
+          <span class="tslider"></span>
+        </label>
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">Stuck sensitivity <em id="stuckVal">0.8</em> m</div>
+        <input type="range" id="stuckSlider" min="0.3" max="3.0" step="0.1" value="0.8"
+               oninput="document.getElementById('stuckVal').textContent=parseFloat(this.value).toFixed(1); sendCmd();">
+      </div>
+      <div class="toggle-row">
+        Hazard avoidance (LiDAR)
+        <label class="toggle">
+          <input type="checkbox" id="hazardEnabled" onchange="sendCmd()">
+          <span class="tslider"></span>
+        </label>
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">Hazard field of view ±<em id="hazFovVal">45</em>°</div>
+        <input type="range" id="hazFovSlider" min="10" max="180" step="5" value="90"
+               oninput="document.getElementById('hazFovVal').textContent=(this.value/2).toFixed(0); sendCmd();">
+      </div>
+    </div>
+  </div>
+
+
+
+</div>
+
+<!-- ── MAP + WAYPOINT DRAWER ── -->
+<div id="mapWrap">
+  <div id="map"></div>
+  <div id="manualHintBar"></div>
+
+  <!-- Waypoint drawer -->
+  <div id="wpDrawer">
+    <div id="wpDrawerHandle" onclick="toggleDrawer()">
+      <h3>📍 Waypoints</h3>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <span class="wp-count" id="wpCount">0</span>
+        <span class="chevron">▲</span>
+      </div>
+    </div>
+    <div id="wpDrawerToolbar">
+      <button class="tbtn" id="placeBtn" onclick="togglePlaceMode()">+ Place</button>
+      <button class="tbtn" id="moveBtn"  onclick="toggleMoveMode()">⤢ Move</button>
+      <button class="tbtn danger" onclick="clearWaypoints()" style="margin-left:auto;">Clear All</button>
+    </div>
+    <ul id="wpList"></ul>
+  </div>
+</div>
+
+<!-- ── RIGHT PANEL ── -->
+<div class="right-panel">
+  <div class="card-title" style="margin-bottom:4px;">Telemetry</div>
+
+  <!-- Rover link status -->
+  <div class="card" id="roverLinkCard" style="border-color:var(--danger);background:#ffe8e8;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div id="roverLinkDot" style="width:14px;height:14px;border-radius:50%;background:var(--danger);flex-shrink:0;box-shadow:0 0 6px var(--danger);"></div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--danger);" id="roverLinkStatus">NO SIGNAL FROM ROVER</div>
+        <div style="font-size:11px;color:var(--dim);" id="roverLinkSub">Waiting for ESP-NOW packets…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alerts -->
+  <div class="alert warn"   id="aLowBat">⚠ Battery Low</div>
+  <div class="alert danger" id="aCritBat">⛔ Battery Critical</div>
+  <div class="alert danger" id="aNoFix">⛔ No GPS Fix</div>
+  <div class="alert danger" id="aStuck">⛔ ROVER STUCK — Not Moving</div>
+
+  <!-- Compass -->
+  <div class="card" style="text-align:center;padding:12px;">
+    <div class="card-title" style="justify-content:center;margin-bottom:8px;">Heading</div>
+    <svg viewBox="0 0 100 100" width="90" height="90" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="46" fill="#e8ecf2" stroke="#b0bcd0" stroke-width="1.5"/>
+      <text x="50" y="12"  text-anchor="middle" font-size="9" fill="#cc0000" font-family="Inter" font-weight="700">N</text>
+      <text x="50" y="96"  text-anchor="middle" font-size="9" fill="#4a5878" font-family="Inter">S</text>
+      <text x="93" y="54"  text-anchor="middle" font-size="9" fill="#4a5878" font-family="Inter">E</text>
+      <text x="7"  y="54"  text-anchor="middle" font-size="9" fill="#4a5878" font-family="Inter">W</text>
+      <g id="needle" transform="rotate(0,50,50)">
+        <polygon points="50,13 46,50 50,60 54,50" fill="#cc0000"/>
+        <polygon points="50,87 46,50 50,60 54,50" fill="#b0bcd0"/>
+      </g>
+      <circle cx="50" cy="50" r="4" fill="#e8ecf2" stroke="#4a5878" stroke-width="1.5"/>
+    </svg>
+    <div style="font-size:26px;font-weight:700;font-family:var(--mono);color:var(--accent);margin-top:4px;" id="hdgNum">—°</div>
+  </div>
+
+  <!-- Hazard avoidance (LiDAR) -->
+  <div class="card" style="text-align:center;padding:12px;">
+    <div class="card-title" style="justify-content:center;margin-bottom:8px;">Hazards <span id="hazClosest" style="font-weight:400;color:var(--dim);font-size:11px;"></span></div>
+    <svg viewBox="0 0 200 110" width="100%" height="100" xmlns="http://www.w3.org/2000/svg">
+      <path id="hazFovWedge" d="" fill="rgba(120,140,180,0.08)" stroke="#b0bcd0" stroke-width="1" stroke-dasharray="3 3"/>
+      <circle cx="100" cy="100" r="4" fill="#4a5878"/>
+      <g id="hazBlips"></g>
+    </svg>
+    <div style="font-size:11px;color:var(--dim);margin-top:2px;" id="hazStatus">disabled</div>
+  </div>
+
+  <!-- Tele grid -->
+  <div class="tele-grid">
+    <div class="tele-cell">
+      <span class="tele-lbl">DISTANCE</span>
+      <div class="tele-val" id="tDist">—</div>
+      <span class="tele-unit">m</span>
+    </div>
+    <div class="tele-cell">
+      <span class="tele-lbl">BEARING</span>
+      <div class="tele-val" id="tBear">—</div>
+      <span class="tele-unit">°</span>
+    </div>
+    <div class="tele-cell">
+      <span class="tele-lbl">SPEED</span>
+      <div class="tele-val" id="tSpeed">—</div>
+      <span class="tele-unit">m/s</span>
+    </div>
+    <div class="tele-cell">
+      <span class="tele-lbl">SATS / HDOP</span>
+      <div class="tele-val" id="tGPS">—</div>
+    </div>
+  </div>
+
+  <!-- Battery -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:6px;">Battery</div>
+    <div style="font-size:26px;font-weight:700;font-family:var(--mono);color:var(--accent);" id="tBat">—</div>
+    <div style="font-size:11px;color:var(--dim);margin-top:2px;">volts · 3S LiPo</div>
+    <div class="bat-bar-outer">
+      <div class="bat-bar-inner" id="batBar" style="width:0%;background:var(--green);"></div>
+    </div>
+  </div>
+
+  <!-- Signal -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:6px;">Signal</div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="rssi-bars" id="rssiBars">
+        <div class="rssi-bar" style="height:5px;"></div>
+        <div class="rssi-bar" style="height:9px;"></div>
+        <div class="rssi-bar" style="height:14px;"></div>
+        <div class="rssi-bar" style="height:18px;"></div>
+        <div class="rssi-bar" style="height:22px;"></div>
+      </div>
+      <div style="font-size:16px;font-weight:600;font-family:var(--mono);color:var(--accent);" id="tRSSI">— dBm</div>
+    </div>
+  </div>
+
+  <!-- Position -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:6px;">Position</div>
+    <div style="font-size:12px;line-height:2;font-family:var(--mono);">
+      <div style="color:var(--sub);">LAT <span id="tLat" style="color:var(--text);">—</span></div>
+      <div style="color:var(--sub);">LON <span id="tLon" style="color:var(--text);">—</span></div>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div>
+    <div class="card-title" style="margin-bottom:6px;">Log</div>
+    <div id="logBox"></div>
+  </div>
+</div>
+
+<script>
+// ── STATE ────────────────────────────────────────────────────
+let port=null, reader=null, connected=false;
+let driveMode=0, manualDir=0;
+let currentWpIndex=0, waypoints=[], wpMarkers=[];
+let roverMarker=null, targetLine=null, routeLine=null, routeArrows=[];
+
+function updateRouteLine() {
+  if (routeLine) { map.removeLayer(routeLine); routeLine=null; }
+  routeArrows.forEach(a => map.removeLayer(a));
+  routeArrows = [];
+  if (waypoints.length < 2) return;
+
+  const latlngs = waypoints.map(wp => [wp.lat, wp.lon]);
+  const looping = document.getElementById('loopMode')?.checked && waypoints.length > 1;
+  if (looping) latlngs.push(latlngs[0]); // close the loop visually
+  routeLine = L.polyline(latlngs, {
+    color: '#ffcc44', weight: 2, dashArray: '6 8', opacity: 0.75
+  }).addTo(map);
+
+  // Arrow at midpoint of each leg (including return leg if looping)
+  const legs = looping ? waypoints.length : waypoints.length - 1;
+  for (let i = 0; i < legs; i++) {
+    const a = waypoints[i];
+    const b = waypoints[(i + 1) % waypoints.length];
+    const midLat = (a.lat + b.lat) / 2;
+    const midLon = (a.lon + b.lon) / 2;
+
+    // Bearing from a to b in degrees
+    const dLon = (b.lon - a.lon) * Math.PI / 180;
+    const lat1 = a.lat * Math.PI / 180;
+    const lat2 = b.lat * Math.PI / 180;
+    const x = Math.sin(dLon) * Math.cos(lat2);
+    const y = Math.cos(lat1)*Math.sin(lat2) - Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLon);
+    const bearing = (Math.atan2(x, y) * 180 / Math.PI + 360) % 360;
+
+    const arrowIcon = L.divIcon({
+      html: `<div style="
+        width:0; height:0;
+        border-left: 7px solid transparent;
+        border-right: 7px solid transparent;
+        border-bottom: 14px solid #ffcc44;
+        transform: rotate(${bearing}deg);
+        opacity: 0.9;
+        filter: drop-shadow(0 0 3px rgba(0,0,0,0.5));
+      "></div>`,
+      className: '', iconSize: [14, 14], iconAnchor: [7, 7]
+    });
+
+    const arrow = L.marker([midLat, midLon], { icon: arrowIcon, interactive: false }).addTo(map);
+    routeArrows.push(arrow);
+  }
+}
+let sendInterval=null, serialBuf='';
+let tripLog=[], lastLogMs=0;
+let arrived=false, paused=false, missionRunning=false;
+let startConfirmTimer=null;
+let placingWaypoints=false, movingWaypoints=false;
+let editingWpIdx=-1;
+let lastRoverPacketMs=0;
+let roverLinked=false;
+
+function updateRoverLink() {
+  const card   = document.getElementById('roverLinkCard');
+  const dot    = document.getElementById('roverLinkDot');
+  const status = document.getElementById('roverLinkStatus');
+  const sub    = document.getElementById('roverLinkSub');
+  const hRover = document.getElementById('hRover');
+
+  if (!connected) {
+    card.style.borderColor='var(--danger)'; card.style.background='#ffe8e8';
+    dot.style.background='var(--danger)';   dot.style.boxShadow='0 0 6px var(--danger)';
+    status.style.color='var(--danger)';     status.textContent='NO SIGNAL FROM ROVER';
+    sub.textContent='Bridge not connected';
+    hRover.textContent='NO SIGNAL'; hRover.style.color='var(--danger)';
+    roverLinked=false; return;
+  }
+
+  const now=Date.now();
+  const age=lastRoverPacketMs ? (now-lastRoverPacketMs) : null;
+
+  if (!lastRoverPacketMs) {
+    // Bridge connected but no packets yet
+    card.style.borderColor='var(--warn)'; card.style.background='#fff3e0';
+    dot.style.background='var(--warn)';   dot.style.boxShadow='0 0 6px var(--warn)';
+    status.style.color='var(--warn)';     status.textContent='WAITING FOR ROVER…';
+    sub.textContent='Bridge online — no ESP-NOW packets yet';
+    hRover.textContent='WAITING'; hRover.style.color='var(--warn)';
+    roverLinked=false;
+  } else if (age < 2000) {
+    // Packets arriving — linked
+    card.style.borderColor='var(--green)'; card.style.background='#e6f9ee';
+    dot.style.background='var(--green)';   dot.style.boxShadow='0 0 6px var(--green)';
+    status.style.color='var(--green)';     status.textContent='ROVER LINKED';
+    sub.textContent='Last packet: ' + (age < 1000 ? age+'ms ago' : (age/1000).toFixed(1)+'s ago');
+    hRover.textContent='LINKED'; hRover.style.color='var(--green)';
+    roverLinked=true;
+  } else {
+    // Packets have stopped
+    card.style.borderColor='var(--danger)'; card.style.background='#ffe8e8';
+    dot.style.background='var(--danger)';   dot.style.boxShadow='0 0 6px var(--danger)';
+    status.style.color='var(--danger)';     status.textContent='ROVER SIGNAL LOST';
+    sub.textContent='Last seen: '+(age/1000).toFixed(0)+'s ago — check rover power';
+    hRover.textContent='LOST'; hRover.style.color='var(--danger)';
+    roverLinked=false;
+  }
+}
+
+// Update rover link status every 500ms
+setInterval(updateRoverLink, 500);
+
+// ── MAP ──────────────────────────────────────────────────────
+const map = L.map('map', { doubleClickZoom:false }).setView([-37.8908, 175.4326], 18);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'© OpenStreetMap', maxZoom:20
+}).addTo(map);
+
+const roverIcon = L.divIcon({
+  html:`<div style="width:18px;height:18px;background:#4db8ff;border:3px solid #fff;border-radius:50%;box-shadow:0 0 10px #4db8ff88;"></div>`,
+  className:'', iconSize:[18,18], iconAnchor:[9,9]
+});
+
+function wpIcon(n, active, label) {
+  const col = active ? '#3ddc84' : '#4db8ff';
+  const txt = label || (n+1);
+  return L.divIcon({
+    html:`<div style="min-width:24px;height:24px;background:${col};border:2px solid #fff;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#0a0f1e;font-size:10px;font-weight:700;font-family:Inter,sans-serif;padding:0 4px;">${txt}</div>`,
+    className:'', iconSize:[24,24], iconAnchor:[12,12]
+  });
+}
+
+map.on('click', (e) => {
+  if (!placingWaypoints) return;
+  addWaypoint(e.latlng.lat, e.latlng.lng);
+});
+
+// ── DRAWER ───────────────────────────────────────────────────
+let drawerOpen = false;
+function toggleDrawer() {
+  drawerOpen = !drawerOpen;
+  document.getElementById('wpDrawer').classList.toggle('open', drawerOpen);
+}
+
+// ── PLACE MODE ───────────────────────────────────────────────
+function togglePlaceMode() {
+  placingWaypoints = !placingWaypoints;
+  const btn = document.getElementById('placeBtn');
+  const mapEl = document.getElementById('map');
+  if (placingWaypoints) {
+    if (movingWaypoints) toggleMoveMode();
+    btn.classList.add('active'); btn.textContent = '✕ Done';
+    mapEl.style.cursor = 'crosshair';
+    map.dragging.disable();
+  } else {
+    btn.classList.remove('active'); btn.textContent = '+ Place';
+    mapEl.style.cursor = '';
+    map.dragging.enable();
+  }
+}
+
+// ── MOVE MODE ────────────────────────────────────────────────
+function toggleMoveMode() {
+  movingWaypoints = !movingWaypoints;
+  const btn = document.getElementById('moveBtn');
+  if (movingWaypoints) {
+    if (placingWaypoints) togglePlaceMode();
+    btn.classList.add('active'); btn.textContent = '✕ Done';
+    wpMarkers.forEach((m,i) => {
+      m.dragging.enable();
+      m.on('dragend', (ev) => {
+        const ll = ev.target.getLatLng();
+        waypoints[i].lat = ll.lat; waypoints[i].lon = ll.lng;
+        renderWpList(); updateRouteLine();
+      });
+    });
+  } else {
+    btn.classList.remove('active'); btn.textContent = '⤢ Move';
+    wpMarkers.forEach(m => { m.dragging.disable(); m.off('dragend'); });
+  }
+}
+
+// ── WAYPOINTS ────────────────────────────────────────────────
+function addWaypoint(lat, lon) {
+  const idx = waypoints.length;
+  const globalSpd = parseInt(document.getElementById('speedSlider').value);
+  const globalRad = parseFloat(document.getElementById('radiusSlider').value);
+  waypoints.push({ lat, lon, speed: globalSpd, radius: globalRad, label: '' });
+  const marker = L.marker([lat,lon], { icon: wpIcon(idx, idx===currentWpIndex, '') }).addTo(map);
+  marker.on('dblclick', (e) => { L.DomEvent.stopPropagation(e); openWpEdit(idx, e); });
+  if (movingWaypoints) {
+    marker.dragging.enable();
+    marker.on('dragend', (ev) => {
+      const ll = ev.target.getLatLng();
+      waypoints[idx].lat = ll.lat; waypoints[idx].lon = ll.lng;
+      renderWpList(); updateRouteLine();
+    });
+  }
+  wpMarkers.push(marker);
+  renderWpList();
+  updateRouteLine();
+  updateStartBtn();
+  if (missionRunning && waypoints.length === 1) sendNextWaypoint();
+}
+
+function renderWpList() {
+  const ul = document.getElementById('wpList');
+  ul.innerHTML = '';
+  waypoints.forEach((wp,i) => {
+    const li = document.createElement('li');
+    if (i===currentWpIndex) li.className='active-wp';
+    else if (i<currentWpIndex) li.className='done-wp';
+    li.innerHTML = `
+      <span class="wp-num">${i+1}</span>
+      <span class="wp-coords">${wp.lat.toFixed(4)}, ${wp.lon.toFixed(4)}${wp.label?' · '+wp.label:''}</span>
+      <span class="wp-spd">⚡${wp.speed}</span>
+      <span class="wp-rad">◎${wp.radius}m</span>
+      <span class="wp-edit-btn" onclick="openWpEditFromList(${i})">✎</span>
+      <span class="wp-del-btn" onclick="deleteWp(${i})">✕</span>`;
+    li.onclick = (e) => { if (!['wp-edit-btn','wp-del-btn'].includes(e.target.className)) jumpToWp(i); };
+    ul.appendChild(li);
+    // Update marker icon
+    if (wpMarkers[i]) wpMarkers[i].setIcon(wpIcon(i, i===currentWpIndex, wp.label));
+  });
+  document.getElementById('wpCount').textContent = waypoints.length;
+}
+
+function deleteWp(i) {
+  map.removeLayer(wpMarkers[i]);
+  wpMarkers.splice(i,1); waypoints.splice(i,1);
+  wpMarkers.forEach((m,j) => m.setIcon(wpIcon(j, j===currentWpIndex, waypoints[j]?.label||'')));
+  if (currentWpIndex>=waypoints.length) currentWpIndex=Math.max(0,waypoints.length-1);
+  renderWpList(); updateRouteLine(); updateStartBtn();
+}
+
+function jumpToWp(i) {
+  currentWpIndex=i; renderWpList();
+  sendWaypoint(waypoints[i].lat, waypoints[i].lon, i);
+}
+
+function clearWaypoints() {
+  wpMarkers.forEach(m=>map.removeLayer(m));
+  wpMarkers=[]; waypoints=[]; currentWpIndex=0;
+  if (routeLine) { map.removeLayer(routeLine); routeLine=null; }
+  routeArrows.forEach(a=>map.removeLayer(a)); routeArrows=[];
+  renderWpList(); updateStartBtn();
+}
+
+function sendNextWaypoint() {
+  if (!missionRunning) return;
+  if (currentWpIndex<waypoints.length) {
+    const wp=waypoints[currentWpIndex];
+    sendWaypoint(wp.lat, wp.lon, currentWpIndex);
+  }
+}
+function sendWaypoint(lat,lon,idx) { sendCmd({lat,lon,wpIdx:idx}); }
+
+// ── WAYPOINT EDIT POPUP ──────────────────────────────────────
+function openWpEdit(idx, leafletEvent) {
+  editingWpIdx=idx;
+  const wp=waypoints[idx];
+  document.getElementById('epNum').textContent=idx+1;
+  document.getElementById('epLat').value=wp.lat.toFixed(6);
+  document.getElementById('epLon').value=wp.lon.toFixed(6);
+  document.getElementById('epSpd').value=wp.speed;
+  document.getElementById('epSpdVal').textContent=wp.speed;
+  document.getElementById('epRad').value=wp.radius;
+  document.getElementById('epRadVal').textContent=wp.radius;
+  document.getElementById('epLabel').value=wp.label||'';
+  const popup=document.getElementById('wpEditPopup');
+  const x=Math.min(leafletEvent.originalEvent.clientX+12, window.innerWidth-280);
+  const y=Math.min(leafletEvent.originalEvent.clientY+12, window.innerHeight-360);
+  popup.style.left=x+'px'; popup.style.top=y+'px';
+  popup.className='visible';
+}
+function openWpEditFromList(idx) {
+  editingWpIdx=idx;
+  const wp=waypoints[idx];
+  document.getElementById('epNum').textContent=idx+1;
+  document.getElementById('epLat').value=wp.lat.toFixed(6);
+  document.getElementById('epLon').value=wp.lon.toFixed(6);
+  document.getElementById('epSpd').value=wp.speed;
+  document.getElementById('epSpdVal').textContent=wp.speed;
+  document.getElementById('epRad').value=wp.radius;
+  document.getElementById('epRadVal').textContent=wp.radius;
+  document.getElementById('epLabel').value=wp.label||'';
+  const popup=document.getElementById('wpEditPopup');
+  popup.style.left='360px'; popup.style.top='120px';
+  popup.className='visible';
+}
+function confirmWpEdit() {
+  if (editingWpIdx<0) return;
+  const lat=parseFloat(document.getElementById('epLat').value);
+  const lon=parseFloat(document.getElementById('epLon').value);
+  if (isNaN(lat)||isNaN(lon)) return;
+  waypoints[editingWpIdx].lat=lat;
+  waypoints[editingWpIdx].lon=lon;
+  waypoints[editingWpIdx].speed=parseInt(document.getElementById('epSpd').value);
+  waypoints[editingWpIdx].radius=parseFloat(document.getElementById('epRad').value);
+  waypoints[editingWpIdx].label=document.getElementById('epLabel').value.trim();
+  wpMarkers[editingWpIdx].setLatLng([lat,lon]);
+  renderWpList(); updateRouteLine(); closeWpEdit();
+}
+function closeWpEdit() {
+  editingWpIdx=-1;
+  document.getElementById('wpEditPopup').className='';
+}
+
+// ── SETTINGS EXPANDER ────────────────────────────────────────
+let settingsOpen=false;
+function toggleSettings() {
+  settingsOpen=!settingsOpen;
+  document.getElementById('settingsBody').classList.toggle('open',settingsOpen);
+  document.getElementById('settingsExp').classList.toggle('open',settingsOpen);
+}
+
+// ── MODE ─────────────────────────────────────────────────────
+function setMode(m) {
+  driveMode=m;
+  document.getElementById('btnManual').className='mode-btn'+(m===0?' active':'');
+  document.getElementById('btnAuto').className  ='mode-btn'+(m===1?' active':'');
+  updateStartBtn();
+  sendCmd();
+}
+
+// ── START MISSION ────────────────────────────────────────────
+function updateStartBtn() {
+  const btn=document.getElementById('startBtn');
+  const hint=document.getElementById('startHint');
+  if (!connected)             { btn.disabled=true; hint.textContent='Connect to enable'; return; }
+  if (driveMode===0)          { btn.disabled=true; hint.textContent='Switch to Auto mode to start'; return; }
+  if (waypoints.length===0)   { btn.disabled=true; hint.textContent='Add waypoints to begin'; return; }
+  btn.disabled=false;
+  if (missionRunning) {
+    btn.className='running'; btn.textContent='■ STOP MISSION'; hint.textContent='Mission in progress';
+  } else {
+    btn.className=''; btn.textContent='START MISSION'; hint.textContent='Ready — click to arm';
+  }
+}
+
+function handleStart() {
+  const btn=document.getElementById('startBtn');
+  if (missionRunning) { stopMission(); return; }
+  if (btn.classList.contains('confirm')) {
+    // Second click — confirmed
+    clearTimeout(startConfirmTimer);
+    btn.classList.remove('confirm');
+    startMission();
+  } else {
+    // First click — arm
+    btn.classList.add('confirm');
+    btn.textContent='CONFIRM START →';
+    startConfirmTimer=setTimeout(()=>{
+      btn.classList.remove('confirm');
+      btn.textContent='START MISSION';
+    },3000);
+  }
+}
+
+function startMission() {
+  missionRunning=true; currentWpIndex=0; arrived=false; paused=false;
+  updateStartBtn();
+  if (driveMode===1) document.getElementById('runningControls').style.display='block';
+  sendNextWaypoint();
+  log('Mission started — '+waypoints.length+' waypoints','ok');
+}
+function stopMission() {
+  missionRunning=false; paused=false;
+  document.getElementById('runningControls').style.display='none';
+  updateStartBtn();
+  emergencyStop();
+  log('Mission stopped');
+}
+
+// ── PAUSE / ADVANCE ──────────────────────────────────────────
+function togglePause() {
+  paused=!paused;
+  ['pauseBtn','pauseBtn2'].forEach(id=>{
+    const b=document.getElementById(id);
+    if (!b) return;
+    b.textContent=paused?'▶ Resume':'⏸ Pause';
+    b.className=paused?'btn green':'btn warn';
+  });
+  sendCmd();
+  log(paused?'Paused':'Resumed');
+}
+
+function manualAdvance() {
+  arrived=false;
+  document.getElementById('arrivedCard').style.display='none';
+  currentWpIndex++;
+  const looping = document.getElementById('loopMode').checked;
+  if (currentWpIndex >= waypoints.length) {
+    if (looping) {
+      currentWpIndex = 0;
+      log('Loop: returning to waypoint 1');
+    } else {
+      log('All waypoints complete ✔','ok');
+      stopMission(); return;
+    }
+  }
+  renderWpList(); sendNextWaypoint();
+  log('Advancing to waypoint '+(currentWpIndex+1));
+}
+
+function onAutoAdvChange() {
+  const isAuto=document.getElementById('autoAdvance').checked;
+  document.getElementById('manualAdvControls').style.display=isAuto?'none':'block';
+  if (isAuto) {
+    arrived=false;
+    document.getElementById('arrivedCard').style.display='none';
+  }
+  sendCmd();
+}
+
+// ── SERIAL ───────────────────────────────────────────────────
+async function connectSerial() {
+  if (!('serial' in navigator)) { log('Web Serial not supported — use Chrome','err'); return; }
+  if (connected) { disconnectSerial(); return; }
+  try {
+    port=await navigator.serial.requestPort();
+    await port.open({baudRate:115200});
+    connected=true;
+    document.getElementById('connectBtn').textContent='DISCONNECT';
+    document.getElementById('connectBtn').className='connected';
+    document.getElementById('hComms').textContent='ONLINE';
+    document.getElementById('hComms').style.color='var(--green)';
+    log('Serial connected','ok');
+    startReading();
+    sendInterval=setInterval(()=>sendCmd(),100);
+    updateStartBtn();
+  } catch(e) { log('Connect failed: '+e.message,'err'); }
+}
+
+async function disconnectSerial() {
+  connected=false;
+  if (sendInterval) clearInterval(sendInterval);
+  if (reader) { try{await reader.cancel();}catch(e){} reader=null; }
+  if (serialWriter) { try{await serialWriter.close();}catch(e){} serialWriter=null; }
+  if (port)   { try{await port.close();}  catch(e){} port=null; }
+  document.getElementById('connectBtn').textContent='CONNECT';
+  document.getElementById('connectBtn').className='';
+  document.getElementById('hComms').textContent='OFFLINE';
+  document.getElementById('hComms').style.color='var(--danger)';
+  updateStartBtn();
+}
+
+async function startReading() {
+  const decoder=new TextDecoderStream();
+  port.readable.pipeTo(decoder.writable);
+  reader=decoder.readable.getReader();
+  try {
+    while (connected) {
+      const {value,done}=await reader.read();
+      if (done) break;
+      serialBuf+=value;
+      let nl;
+      while ((nl=serialBuf.indexOf('\n'))!==-1) {
+        const line=serialBuf.slice(0,nl).trim();
+        serialBuf=serialBuf.slice(nl+1);
+        if (line) parseTelemetry(line);
+      }
+    }
+  } catch(e) { log('Read error: '+e.message,'err'); }
+}
+
+let serialWriter = null;
+
+async function writeLine(str) {
+  if (!connected || !port?.writable) return;
+  try {
+    if (!serialWriter) {
+      const enc = new TextEncoderStream();
+      enc.readable.pipeTo(port.writable);
+      serialWriter = enc.writable.getWriter();
+    }
+    await serialWriter.write(str + '\n');
+  } catch(e) {
+    log('Write error: ' + e.message, 'err');
+    serialWriter = null;
+  }
+}
+
+// ── COMMAND ──────────────────────────────────────────────────
+function sendCmd(extra={}) {
+  if (!connected) return;
+  const wpNow = missionRunning ? waypoints[extra.wpIdx??currentWpIndex] : null;
+  const cmd={
+    type:'cmd',
+    lat:  extra.lat ?? (wpNow?.lat ?? 0),
+    lon:  extra.lon ?? (wpNow?.lon ?? 0),
+    radius: wpNow?.radius ?? parseFloat(document.getElementById('radiusSlider').value),
+    speed:  paused ? 0 : (wpNow?.speed ?? parseInt(document.getElementById('speedSlider').value)),
+    mode:   driveMode,
+    dir:    manualDir,
+    hlock:  document.getElementById('headingLock').checked?1:0,
+    hlbear: parseFloat(document.getElementById('hlSlider').value),
+    adv:      document.getElementById('autoAdvance').checked?1:0,
+    wpIdx:    extra.wpIdx??currentWpIndex,
+    stuckThr: document.getElementById('stuckDetect').checked
+              ? parseFloat(document.getElementById('stuckSlider').value)
+              : 0,
+    hazFov: parseInt(document.getElementById('hazFovSlider').value),
+    hazOn:  document.getElementById('hazardEnabled').checked?1:0
+  };
+  writeLine(JSON.stringify(cmd));
+}
+
+function emergencyStop() {
+  missionRunning=false; manualDir=0; paused=false;
+  const stopCmd=JSON.stringify({type:'cmd',mode:0,dir:0,speed:0,lat:0,lon:0,radius:7,hlock:0,hlbear:0,adv:0,wpIdx:0,stuckThr:0});
+  // Send 3 times to make sure it gets through
+  writeLine(stopCmd);
+  setTimeout(()=>writeLine(stopCmd), 100);
+  setTimeout(()=>writeLine(stopCmd), 200);
+  updateStartBtn();
+  log('⚡ E-STOP','err');
+}
+
+// ── TELEMETRY ────────────────────────────────────────────────
+function parseTelemetry(line) {
+  if (!line.startsWith('{')) return;  // ignore non-JSON (boot messages etc)
+  try {
+    const d=JSON.parse(line);
+    if (d.type!=='tele') { log(line); return; }
+    lastRoverPacketMs=Date.now();
+
+    // Map
+    if (d.lat!==0||d.lon!==0) {
+      if (!roverMarker) { roverMarker=L.marker([d.lat,d.lon],{icon:roverIcon}).addTo(map); }
+      else roverMarker.setLatLng([d.lat,d.lon]);
+      if (waypoints[currentWpIndex]) {
+        if (targetLine) map.removeLayer(targetLine);
+        const wp=waypoints[currentWpIndex];
+        targetLine=L.polyline([[d.lat,d.lon],[wp.lat,wp.lon]],
+          {color:'#3ddc84',weight:1.5,dashArray:'5 5',opacity:0.7}).addTo(map);
+      }
+    }
+
+    // Compass
+    document.getElementById('needle').setAttribute('transform',`rotate(${d.hdg},50,50)`);
+    document.getElementById('hdgNum').textContent=d.hdg.toFixed(1)+'°';
+
+    // Header pills
+    document.getElementById('hMode').textContent=d.mode===1?'AUTO':'MANUAL';
+    document.getElementById('hFix').textContent=d.fix?'YES':'NO';
+    document.getElementById('hFix').style.color=d.fix?'var(--green)':'var(--danger)';
+    document.getElementById('hWp').textContent=(d.wpIdx+1)+'/'+waypoints.length;
+
+    // Tele
+    document.getElementById('tDist').textContent=d.dist.toFixed(1);
+    document.getElementById('tBear').textContent=d.bear.toFixed(0);
+    document.getElementById('tSpeed').textContent=d.spd<0.01?'0.00':d.spd.toFixed(2);
+    document.getElementById('tGPS').textContent=d.sats+'/'+d.hdop.toFixed(1);
+    document.getElementById('tLat').textContent=d.lat.toFixed(6);
+    document.getElementById('tLon').textContent=d.lon.toFixed(6);
+    document.getElementById('tRSSI').textContent=d.rssi+' dBm';
+
+    // Battery
+    document.getElementById('tBat').textContent=d.bat.toFixed(2);
+    const pct=Math.max(0,Math.min(100,(d.bat-9.9)/(12.6-9.9)*100));
+    const bar=document.getElementById('batBar');
+    bar.style.width=pct+'%';
+    bar.style.background=d.bat<9.9?'var(--danger)':d.bat<10.5?'var(--warn)':'var(--green)';
+
+    // RSSI bars — right panel + header
+    const rssi=d.rssi;
+    const rssiCol=rssi>-70?'var(--green)':rssi>-80?'var(--warn)':'var(--danger)';
+    const levels=[rssi>-90,rssi>-85,rssi>-80,rssi>-75,rssi>-70];
+    document.getElementById('tRSSI').textContent=rssi+' dBm';
+    document.getElementById('hRSSI').textContent=rssi+' dBm';
+    document.getElementById('hRSSI').style.color=rssiCol;
+    document.querySelectorAll('#rssiBars .rssi-bar').forEach((b,i)=>b.style.background=levels[i]?rssiCol:'var(--border)');
+    document.querySelectorAll('#rssiBarsMini .rssi-bar').forEach((b,i)=>b.style.background=levels[i]?rssiCol:'var(--border)');
+
+    // Alerts
+    setAlert('aLowBat', d.bat>3.0&&d.bat<10.5&&d.bat>=9.9,'warn');
+    setAlert('aCritBat',d.bat>3.0&&d.bat<9.9,'danger');
+    setAlert('aNoFix',  !d.fix,'danger');
+    setAlert('aStuck',  d.stuck===1 && document.getElementById('stuckDetect').checked,'danger');
+
+    // Hazard avoidance
+    renderHazardArc(d.haz||[]);
+
+    // Arrived detection (manual advance mode)
+    const isAutoAdv=document.getElementById('autoAdvance').checked;
+    const wpRad=waypoints[currentWpIndex]?.radius??7;
+    if (!isAutoAdv&&driveMode===1&&d.dist<wpRad&&waypoints.length>0&&!arrived&&missionRunning) {
+      arrived=true;
+      document.getElementById('arrivedCard').style.display='block';
+      document.getElementById('arrWpNum').textContent=currentWpIndex+1;
+      const lbl=waypoints[currentWpIndex]?.label;
+      document.getElementById('arrWpLabel').textContent=lbl?'📍 '+lbl:'Use Advance to continue';
+      log('Arrived at WP '+(currentWpIndex+1)+(lbl?' ('+lbl+')':''),'ok');
+    }
+    if (isAutoAdv) document.getElementById('arrivedCard').style.display='none';
+
+    // Auto-advance from rover
+    if (d.wpIdx > currentWpIndex || (d.wpIdx === 0 && currentWpIndex === waypoints.length-1)) {
+      const looping = document.getElementById('loopMode').checked;
+      if (d.wpIdx === 0 && currentWpIndex === waypoints.length-1 && looping) {
+        currentWpIndex = 0;
+        log('Loop: returning to waypoint 1');
+      } else if (d.wpIdx < waypoints.length) {
+        currentWpIndex = d.wpIdx;
+      }
+      arrived=false;
+      document.getElementById('arrivedCard').style.display='none';
+      renderWpList(); sendNextWaypoint();
+    }
+
+    // Trip log every 5s
+    const now=Date.now();
+    if (now-lastLogMs>5000) {
+      tripLog.push({ts:new Date().toISOString(),lat:d.lat,lon:d.lon,hdg:d.hdg,spd:d.spd,bat:d.bat,hdop:d.hdop,sats:d.sats,dist:d.dist});
+      lastLogMs=now;
+    }
+  } catch(e) { log('Parse: '+e.message,'err'); }
+}
+
+function setAlert(id,show,type='warn') {
+  const el=document.getElementById(id);
+  el.className='alert'+(show?' visible '+type:'');
+}
+
+// ── HAZARD ARC WIDGET ────────────────────────────────────────
+const HAZ_MAX_RANGE_MM = 3000; // visualization range cap
+const HAZ_STOP_MM = 400, HAZ_SLOW_MM = 900;
+let lastHazFovDeg = -1;
+
+function updateHazFovWedge() {
+  const fovDeg = parseInt(document.getElementById('hazFovSlider').value);
+  if (fovDeg === lastHazFovDeg) return;
+  lastHazFovDeg = fovDeg;
+  const half = fovDeg/2 * Math.PI/180;
+  const R = 92, cx = 100, cy = 100;
+  const x1 = cx + R*Math.sin(-half), y1 = cy - R*Math.cos(-half);
+  const x2 = cx + R*Math.sin(half),  y2 = cy - R*Math.cos(half);
+  const largeArc = fovDeg > 180 ? 1 : 0;
+  document.getElementById('hazFovWedge').setAttribute('d',
+    `M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)} A${R},${R} 0 ${largeArc} 1 ${x2.toFixed(1)},${y2.toFixed(1)} Z`);
+}
+document.getElementById('hazFovSlider').addEventListener('input', updateHazFovWedge);
+updateHazFovWedge();
+
+function renderHazardArc(clusters) {
+  const on = document.getElementById('hazardEnabled').checked;
+  document.getElementById('hazStatus').textContent = on ? (clusters.length?clusters.length+' object(s) in view':'clear') : 'disabled';
+  updateHazFovWedge();
+
+  const g = document.getElementById('hazBlips');
+  g.innerHTML = '';
+  const cx = 100, cy = 100, R = 92;
+  let closest = null;
+
+  clusters.forEach(c => {
+    const distMm = Math.min(c.d, HAZ_MAX_RANGE_MM);
+    const r = (distMm / HAZ_MAX_RANGE_MM) * R;
+    const rad = c.a * Math.PI / 180;
+    const x = cx + r * Math.sin(rad);
+    const y = cy - r * Math.cos(rad);
+    const color = c.d < HAZ_STOP_MM ? 'var(--danger)' : c.d < HAZ_SLOW_MM ? 'var(--warn)' : 'var(--accent)';
+    const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx', x.toFixed(1));
+    dot.setAttribute('cy', y.toFixed(1));
+    dot.setAttribute('r', 5);
+    dot.setAttribute('fill', color);
+    g.appendChild(dot);
+    if (closest === null || c.d < closest) closest = c.d;
+  });
+
+  document.getElementById('hazClosest').textContent = closest!==null ? (closest/1000).toFixed(1)+'m' : '';
+}
+
+// ── KEYBOARD ─────────────────────────────────────────────────
+const keyMap={ArrowUp:0x01,ArrowDown:0x02,ArrowLeft:0x04,ArrowRight:0x08};
+const pressed={};
+document.addEventListener('keydown',(e)=>{
+  if (e.key==='Escape'){emergencyStop();return;}
+  if (!keyMap[e.key]) return;
+  e.preventDefault();
+  if (pressed[e.key]) return;
+  pressed[e.key]=true; manualDir|=keyMap[e.key];
+  updateManualHint(); sendCmd();
+});
+document.addEventListener('keyup',(e)=>{
+  if (!keyMap[e.key]) return;
+  pressed[e.key]=false; manualDir&=~keyMap[e.key];
+  updateManualHint(); sendCmd();
+});
+function updateManualHint(){
+  const f=manualDir&1,b=manualDir&2,l=manualDir&4,r=manualDir&8;
+  const bar=document.getElementById('manualHintBar');
+  let h='';
+  if(f&&l)h='Forward Left';else if(f&&r)h='Forward Right';
+  else if(b&&l)h='Reverse Left';else if(b&&r)h='Reverse Right';
+  else if(f)h='Forward';else if(b)h='Reverse';
+  else if(l)h='Spin Left';else if(r)h='Spin Right';
+  bar.textContent=h; bar.className=h?'visible':'';
+}
+
+// ── SAVE / LOAD MISSION ──────────────────────────────────────
+function saveMission() {
+  if (!waypoints.length) { log('No waypoints to save','err'); return; }
+  const name=document.getElementById('missionName').value.trim()||'mission';
+  let csv='mission_name,'+name+'\n';
+  csv+='global_speed,'+document.getElementById('speedSlider').value+'\n';
+  csv+='global_radius,'+document.getElementById('radiusSlider').value+'\n';
+  csv+='auto_advance,'+document.getElementById('autoAdvance').checked+'\n';
+  csv+='loop_mode,'+document.getElementById('loopMode').checked+'\n';
+  csv+='heading_lock,'+document.getElementById('headingLock').checked+'\n';
+  csv+='lock_bearing,'+document.getElementById('hlSlider').value+'\n';
+  csv+='\n';
+  csv+='wp,lat,lon,speed,radius,label\n';
+  waypoints.forEach((wp,i)=>{
+    csv+=`${i+1},${wp.lat},${wp.lon},${wp.speed},${wp.radius},${wp.label||''}\n`;
+  });
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=name.replace(/\s+/g,'_')+'.csv';
+  a.click();
+  log('Mission saved: '+name,'ok');
+}
+
+function loadMissionPick() {
+  document.getElementById('missionFilePick').click();
+}
+
+function loadMission(input) {
+  const file=input.files[0]; if (!file) return;
+  const reader=new FileReader();
+  reader.onload=(e)=>{
+    const lines=e.target.result.split('\n').map(l=>l.trim()).filter(l=>l);
+    clearWaypoints();
+    let inWp=false;
+    lines.forEach(line=>{
+      if (line.startsWith('mission_name,')) {
+        document.getElementById('missionName').value=line.split(',')[1]||'';
+      } else if (line.startsWith('global_speed,')) {
+        const v=parseInt(line.split(',')[1]);
+        document.getElementById('speedSlider').value=v;
+        document.getElementById('spdVal').textContent=v;
+      } else if (line.startsWith('global_radius,')) {
+        const v=parseFloat(line.split(',')[1]);
+        document.getElementById('radiusSlider').value=v;
+        document.getElementById('radVal').textContent=v;
+      } else if (line.startsWith('auto_advance,')) {
+        document.getElementById('autoAdvance').checked=line.includes('true');
+        onAutoAdvChange();
+      } else if (line.startsWith('loop_mode,')) {
+        document.getElementById('loopMode').checked=line.includes('true');
+        updateRouteLine();
+      } else if (line.startsWith('heading_lock,')) {
+        document.getElementById('headingLock').checked=line.includes('true');
+      } else if (line.startsWith('lock_bearing,')) {
+        const v=parseFloat(line.split(',')[1]);
+        document.getElementById('hlSlider').value=v;
+        document.getElementById('hlVal').textContent=v;
+      } else if (line.startsWith('wp,lat,')) {
+        inWp=true;
+      } else if (inWp&&!line.startsWith('wp,')) {
+        const parts=line.split(',');
+        if (parts.length>=4) {
+          const lat=parseFloat(parts[1]), lon=parseFloat(parts[2]);
+          const spd=parseInt(parts[3]), rad=parseFloat(parts[4]);
+          const lbl=parts[5]||'';
+          if (!isNaN(lat)&&!isNaN(lon)) {
+            addWaypoint(lat,lon);
+            const idx=waypoints.length-1;
+            waypoints[idx].speed=spd; waypoints[idx].radius=rad; waypoints[idx].label=lbl;
+            wpMarkers[idx].setIcon(wpIcon(idx,idx===currentWpIndex,lbl));
+          }
+        }
+      }
+    });
+    renderWpList(); updateRouteLine();
+    if (waypoints.length) map.fitBounds(wpMarkers.map(m=>m.getLatLng()));
+    log('Mission loaded: '+file.name,'ok');
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+
+// ── TRIP LOG CSV ─────────────────────────────────────────────
+function downloadTripCSV() {
+  if (!tripLog.length) { log('No trip data yet','err'); return; }
+  const name=document.getElementById('missionName').value.trim()||'trip';
+  const header='timestamp,lat,lon,heading,speed_mps,battery_v,hdop,satellites,dist_m\n';
+  const rows=tripLog.map(r=>`${r.ts},${r.lat},${r.lon},${r.hdg},${r.spd},${r.bat},${r.hdop},${r.sats},${r.dist}`).join('\n');
+  const blob=new Blob([header+rows],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=name.replace(/\s+/g,'_')+'_triplog.csv';
+  a.click();
+}
+
+// ── LOG ──────────────────────────────────────────────────────
+function log(msg,type='info') {
+  const box=document.getElementById('logBox');
+  const col=type==='err'?'var(--danger)':type==='ok'?'var(--green)':type==='warn'?'var(--warn)':'var(--sub)';
+  const ts=new Date().toLocaleTimeString();
+  box.innerHTML+=`<div style="color:${col}">[${ts}] ${msg}</div>`;
+  box.scrollTop=box.scrollHeight;
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+updateStartBtn();
+// Auto-advance defaults to off — show manual controls
+document.getElementById('manualAdvControls').style.display='block';
+// Open drawer by default so user sees it
+setTimeout(()=>toggleDrawer(),300);
+log('Ready — Connect serial port to begin');
+log('Auto mode: open waypoint drawer and place points on map');
+</script>
+</body>
+</html>
